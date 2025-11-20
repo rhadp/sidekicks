@@ -1,0 +1,187 @@
+---
+- name: Setup the VM instance
+  hosts: localhost
+  gather_facts: no
+  vars:
+    # Configuration - modify these values
+    project_id: "rhauto-dev"
+    zone: "us-central1-c"
+
+    instance_name: "rhauto-dev"
+    network_name: "rhauto-net"  # VPC network name
+    subnet_name: ""  # Subnet name (optional)
+
+    ssh_username: "rhas"  # Username for SSH access
+    ssh_key_path: "{{ lookup('env', 'HOME') }}/.ssh/auto1-gcp.pub"
+
+    machine_type: "c4a-highmem-96-metal"
+    image_family: "rhel-10-arm64"
+    image_project: "rhel-cloud"
+    boot_disk_size_gb: 20
+    data_disk_size_gb: 100
+
+    volume_mount_point: "/mnt/data"
+
+  tasks:
+    #
+    # get instance information
+    #
+    - name: get instance information
+      google.cloud.gcp_compute_instance_info:
+        zone: "{{ zone }}"
+        filters:
+          - name = {{ instance_name }}
+        project: "{{ project_id }}"
+        auth_kind: application
+      register: instance_info
+
+    - name: extract public IP address
+      set_fact:
+        instance_public_ip: "{{ instance_info.resources[0].networkInterfaces[0].accessConfigs[0].natIP }}"
+      when: instance_info.resources | length > 0
+
+#    - name: Wait for SSH to become available
+#      wait_for:
+#        host: "{{ instance_public_ip }}"
+#        port: 22
+#        delay: 10
+#        timeout: 300
+#        state: started
+#      when: instance_public_ip is defined
+
+    - name: add instance to inventory
+      add_host:
+        name: "{{ instance_name }}"
+        ansible_host: "{{ instance_public_ip }}"
+        ansible_user: "{{ ssh_username }}"
+        ansible_ssh_private_key_file: "{{ ssh_key_path | regex_replace('\\.pub$', '') }}"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+        groups: gcp_instances
+        volume_mount_point: "{{ volume_mount_point }}"
+      when: instance_public_ip is defined
+
+- name: mount the data volume
+  hosts: gcp_instances
+  gather_facts: no
+  become: yes
+
+  tasks:
+    - name: list available block devices
+      command: lsblk
+      register: block_devices
+
+    - name: show available block devices
+      debug:
+        var: block_devices.stdout_lines
+
+    - name: find the root device
+      shell: lsblk -rno NAME,MOUNTPOINT | grep '/$' | cut -d' ' -f1 | sed 's/p\?[0-9]*$//'
+      register: root_device
+
+    - name: find the additional storage device
+      shell: |
+        # Get all disk devices
+        ALL_DISKS=$(lsblk -rno NAME,TYPE | grep disk | awk '{print $1}')
+        # Get the root device (trimmed of whitespace)
+        ROOT_DEVICE=$(echo "{{ root_device.stdout }}" | tr -d '[:space:]')
+        # Filter out the root device
+        for disk in $ALL_DISKS; do
+          # Trim whitespace from disk name
+          disk_trimmed=$(echo "$disk" | tr -d '[:space:]')
+          if [ "$disk_trimmed" != "$ROOT_DEVICE" ]; then
+            echo "$disk_trimmed"
+            break
+          fi
+        done
+      register: additional_device_result
+
+    - name: set additional device name
+      set_fact:
+        additional_device_name: "{{ additional_device_result.stdout }}"
+      when: additional_device_result.stdout != ""
+
+    - name: show additional device found
+      debug:
+        var: additional_device_name
+
+    - name: create filesystem on additional storage device
+      filesystem:
+        fstype: ext4
+        dev: "/dev/{{ additional_device_name }}"
+        force: no
+      when: additional_device_name is defined
+
+    - name: create mount point directory
+      file:
+        path: "{{ volume_mount_point }}"
+        state: directory
+        mode: '0755'
+
+    - name: mount additional storage device
+      mount:
+        path: "{{ volume_mount_point }}"
+        src: "/dev/{{ additional_device_name }}"
+        fstype: ext4
+        state: mounted
+        opts: defaults
+      when: additional_device_name is defined
+
+    - name: set proper ownership on mount point
+      file:
+        path: "{{ volume_mount_point }}"
+        owner: root
+        group: root
+        mode: '0755'
+
+#
+# upgrade RHEL and install packages
+#
+- name: upgrade RHEL and install packages
+  hosts: gcp_instances
+  gather_facts: no
+  become: yes
+
+  tasks:
+    - name: upgrade all packages
+      dnf:
+        name: "*"
+        state: latest
+      register: upgrade_result
+
+    - name: install additional packages
+      dnf:
+        name:
+          - git
+          - podman
+          - podman-docker
+          - python3-pip
+          - buildah
+          - skopeo
+          - jq
+          - curl
+          - dotnet-sdk-9.0
+          - make
+          - cmake
+          - gcc
+          - g++
+          - libvirt
+          - virt-install
+          - libvirt-daemon-kvm
+          - libvirt-daemon-config-network
+          - qemu-kvm
+          - qemu-img
+          - "@virtualization-hypervisor"
+          - "@virtualization-client"
+          - "@virtualization-platform"
+          - "@virtualization-tools"
+        state: present
+
+    - name: enable libvirtd service
+      systemd:
+        name: libvirtd
+        enabled: yes
+
+    - name: start libvirtd service
+      systemd:
+        name: libvirtd
+        state: started
