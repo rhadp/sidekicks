@@ -12,6 +12,6 @@
     #    name: roles/gather-cluster-facts
 
     - name: destroy a VM instance (gcp)
-      when: "{{ cloud_provider }} == 'gcp'"
+      when: cloud_provider == "gcp"
       include_role:
         name: roles/create-vm-gcp

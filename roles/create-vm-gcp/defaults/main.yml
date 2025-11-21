@@ -1,10 +1,10 @@
 ---
 
-# Network Configuration
+# network configuration
 vpc_name: "rhauto-net"
 vpc_auto_create_subnetworks: false
 
-# Subnet Configuration
+# subnet configuration
 subnet_name: "rhauto-subnet"
 subnet_cidr: "10.0.0.0/24"
 
@@ -38,3 +38,6 @@ vm_tags:
   - http
   - https
   - ssh
+
+# volume mount point
+volume_mount_point: "/mnt/data"

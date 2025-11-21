@@ -1,7 +1,7 @@
 # Implement your install deployment tasks here
 # -------------------------------------------------
 
-- name: Create data disk
+- name: create data disk
   google.cloud.gcp_compute_disk:
     name: "{{ data_disk_name }}"
     size_gb: "{{ data_disk_size_gb }}"
@@ -13,7 +13,12 @@
     state: present
   register: data_disk
 
-- name: Create VM instance with RHEL 10
+- name: read SSH public key
+  slurp:
+    src: "{{ ssh_key_path }}"
+  register: ssh_public_key
+
+- name: create VM instance with rhel10
   google.cloud.gcp_compute_instance:
     name: "{{ vm_name }}"
     machine_type: "{{ vm_machine_type }}"
@@ -23,6 +28,8 @@
     scheduling:
       on_host_maintenance: TERMINATE
       automatic_restart: false
+    metadata:
+      ssh-keys: "{{ ssh_username }}:{{ ssh_public_key.content | b64decode }}"
     disks:
       - auto_delete: "{{ boot_disk_auto_delete }}"
         boot: true
@@ -46,12 +53,96 @@
     state: present
   register: vm_instance
 
-- name: Display VM instance information
-  debug:
-    msg:
-      - "VM Instance created successfully"
-      - "Instance Name: {{ vm_instance.name }}"
-      - "Instance Type: {{ vm_instance.machineType }}"
-      - "Zone: {{ vm_instance.zone }}"
-      - "Internal IP: {{ vm_instance.networkInterfaces[0].networkIP }}"
-      - "External IP: {{ vm_instance.networkInterfaces[0].accessConfigs[0].natIP | default('Not assigned') }}"
+- name: set vm facts
+  set_fact:
+    instance_internal_ip: "{{ vm_instance.networkInterfaces[0].networkIP }}"
+    instance_public_ip: "{{ vm_instance.networkInterfaces[0].accessConfigs[0].natIP }}"
+
+- name: wait for ssh to become available
+  wait_for:
+    host: "{{ instance_public_ip }}"
+    port: 22
+    delay: 10
+    timeout: 300
+    state: started
+
+- name: add host key to known_hosts
+  known_hosts:
+    name: "{{ instance_public_ip }}"
+    key: "{{ lookup('pipe', 'ssh-keyscan -H ' + instance_public_ip) }}"
+    state: present
+
+- name: mount the data volume
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  vars:
+    ansible_user: "{{ ssh_username }}"
+    ansible_ssh_private_key_file: "{{ ssh_key_path | regex_replace('\\.pub$', '') }}"
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  block:
+    - name: list available block devices
+      command: lsblk
+      register: block_devices
+
+    #- name: show available block devices
+    #  debug:
+    #    var: block_devices.stdout_lines
+
+    - name: find the root device
+      shell: lsblk -rno NAME,MOUNTPOINT | grep '/$' | cut -d' ' -f1 | sed 's/p\?[0-9]*$//'
+      register: root_device
+
+    - name: find the additional storage device
+      shell: |
+        # Get all disk devices
+        ALL_DISKS=$(lsblk -rno NAME,TYPE | grep disk | awk '{print $1}')
+        # Get the root device (trimmed of whitespace)
+        ROOT_DEVICE=$(echo "{{ root_device.stdout }}" | tr -d '[:space:]')
+        # Filter out the root device
+        for disk in $ALL_DISKS; do
+          # Trim whitespace from disk name
+          disk_trimmed=$(echo "$disk" | tr -d '[:space:]')
+          if [ "$disk_trimmed" != "$ROOT_DEVICE" ]; then
+            echo "$disk_trimmed"
+            break
+          fi
+        done
+      register: additional_device_result
+
+    - name: set additional device name
+      set_fact:
+        additional_device_name: "{{ additional_device_result.stdout }}"
+      when: additional_device_result.stdout != ""
+
+    #- name: show additional device found
+    #  debug:
+    #    var: additional_device_name
+
+    - name: create filesystem on additional storage device
+      filesystem:
+        fstype: ext4
+        dev: "/dev/{{ additional_device_name }}"
+        force: no
+      when: additional_device_name is defined
+
+    - name: create mount point directory
+      file:
+        path: "{{ volume_mount_point }}"
+        state: directory
+        mode: "0755"
+
+    - name: mount additional storage device
+      mount:
+        path: "{{ volume_mount_point }}"
+        src: "/dev/{{ additional_device_name }}"
+        fstype: ext4
+        state: mounted
+        opts: defaults
+      when: additional_device_name is defined
+
+    - name: set proper ownership on mount point
+      file:
+        path: "{{ volume_mount_point }}"
+        owner: root
+        group: root
+        mode: "0755"

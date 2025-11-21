@@ -12,6 +12,10 @@
     #    name: roles/gather-cluster-facts
 
     - name: create a VM instance (gcp)
-      when: "{{ cloud_provider }} == 'gcp'"
+      when: cloud_provider == "gcp"
       include_role:
         name: roles/create-vm-gcp
+
+    - name: show ssh details
+      debug:
+        msg: "ssh -i {{ ssh_key_path | regex_replace('\\.pub$', '') }} {{ ssh_username }}@{{ instance_public_ip }}"

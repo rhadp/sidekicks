@@ -1,7 +1,7 @@
 # Implement your uninstall deployment tasks here
 # -------------------------------------------------
 
-- name: Delete VM instance
+- name: delete vm instance
   google.cloud.gcp_compute_instance:
     name: "{{ vm_name }}"
     zone: "{{ gcp_zone }}"
@@ -10,7 +10,7 @@
     service_account_file: "{{ gcp_cred_file }}"
     state: absent
 
-- name: Delete data disk
+- name: delete data disk (if it exists)
   google.cloud.gcp_compute_disk:
     name: "{{ data_disk_name }}"
     zone: "{{ gcp_zone }}"
@@ -19,7 +19,7 @@
     service_account_file: "{{ gcp_cred_file }}"
     state: absent
 
-- name: Delete VPC network (cascades subnet, routes, firewall rules)
+- name: delete VPC network (cascades subnet, routes, firewall rules)
   google.cloud.gcp_compute_network:
     name: "{{ vpc_name }}"
     project: "{{ gcp_project }}"
@@ -27,6 +27,3 @@
     service_account_file: "{{ gcp_cred_file }}"
     state: absent
 
-- name: Display uninstall completion message
-  debug:
-    msg: "All GCP resources have been successfully deleted"
