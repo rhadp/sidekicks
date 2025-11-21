@@ -11,13 +11,13 @@
         aws_access_key: "{{ aws_access_key_id }}"
         aws_secret_key: "{{ aws_secret_access_key }}"
         region: "{{ aws_default_region }}"
-      register: vm_info
+      register: instance_info
 
     - name: set public ip facts
       set_fact:
-        instance_public_ip: "{{ vm_info.instances[0].public_ip_address }}"
-        instance_public_dns: "{{ vm_info.instances[0].public_dns_name }}"
-      when: vm_info.instances | length > 0
+        instance_public_ip: "{{ instance_info.instances[0].public_ip_address }}"
+        instance_public_dns: "{{ instance_info.instances[0].public_dns_name }}"
+      when: instance_info.instances | length > 0
 
 - name: gather facts (azure)
   when: cloud_provider == "azure"
@@ -31,12 +31,12 @@
         secret: "{{ azure_password }}"
         tenant: "{{ azure_tenant }}"
         subscription_id: "{{ azure_subscription }}"
-      register: pip_info
+      register: instance_info
 
     - name: set public ip facts
       set_fact:
-        instance_public_ip: "{{ pip_info.publicipaddresses[0].ip_address }}"
-      when: pip_info.publicipaddresses | length > 0
+        instance_public_ip: "{{ instance_info.publicipaddresses[0].ip_address }}"
+      when: instance_info.publicipaddresses | length > 0
 
 - name: gather facts (gcp)
   when: cloud_provider == "gcp"
@@ -54,3 +54,4 @@
     - name: set public ip facts
       set_fact:
         instance_public_ip: "{{ instance_info.resources[0].networkInterfaces[0].accessConfigs[0].natIP }}"
+      when: instance_info.resources | length > 0
