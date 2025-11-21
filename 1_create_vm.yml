@@ -1,0 +1,16 @@
+- name: create a VM instance
+  hosts: localhost
+  vars:
+    # set the following to control the install/uninstall process
+    silent: false
+    become_override: false
+    ACTION: "INSTALL" # INSTALL, UNINSTALL, UPDATE
+
+  tasks:
+    #- name: gather cluster facts
+    #  include_role:
+    #    name: roles/gather-cluster-facts
+
+    - name: create a VM instance
+      include_role:
+        name: roles/create-vm

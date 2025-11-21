@@ -1,0 +1,19 @@
+secrets/**
+inventory/**
+.env
+
+bin/**
+**/.env-*.sh
+**/venv/**
+
+tmp/**
+hack.*
+**hack**.yml
+cheatsheet.md
+hacking.md
+stuff.md
+
+# AI foo
+.claude/**
+.cursor/**
+CLAUDE.md

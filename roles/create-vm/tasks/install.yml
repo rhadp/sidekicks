@@ -1,0 +1,57 @@
+# Implement your install deployment tasks here
+# -------------------------------------------------
+
+- name: Create data disk
+  google.cloud.gcp_compute_disk:
+    name: "{{ data_disk_name }}"
+    size_gb: "{{ data_disk_size_gb }}"
+    type: "{{ data_disk_type }}"
+    zone: "{{ gcp_zone }}"
+    project: "{{ gcp_project }}"
+    auth_kind: "{{ gcp_cred_kind }}"
+    service_account_file: "{{ gcp_cred_file }}"
+    state: present
+  register: data_disk
+
+- name: Create VM instance with RHEL 10
+  google.cloud.gcp_compute_instance:
+    name: "{{ vm_name }}"
+    machine_type: "{{ vm_machine_type }}"
+    zone: "{{ gcp_zone }}"
+    tags:
+      items: "{{ vm_tags }}"
+    scheduling:
+      on_host_maintenance: TERMINATE
+      automatic_restart: false
+    disks:
+      - auto_delete: "{{ boot_disk_auto_delete }}"
+        boot: true
+        initialize_params:
+          disk_size_gb: "{{ boot_disk_size_gb }}"
+          disk_type: "{{ boot_disk_type }}"
+          source_image: "projects/{{ os_image_project }}/global/images/family/{{ os_image_family }}"
+      - auto_delete: "{{ data_disk_auto_delete }}"
+        boot: false
+        source: "{{ data_disk }}"
+    network_interfaces:
+      - network: "{{ vpc_network }}"
+        subnetwork: "{{ subnet }}"
+        access_configs:
+          - name: External NAT
+            type: ONE_TO_ONE_NAT
+            network_tier: "{{ vm_network_tier }}"
+    project: "{{ gcp_project }}"
+    auth_kind: "{{ gcp_cred_kind }}"
+    service_account_file: "{{ gcp_cred_file }}"
+    state: present
+  register: vm_instance
+
+- name: Display VM instance information
+  debug:
+    msg:
+      - "VM Instance created successfully"
+      - "Instance Name: {{ vm_instance.name }}"
+      - "Instance Type: {{ vm_instance.machineType }}"
+      - "Zone: {{ vm_instance.zone }}"
+      - "Internal IP: {{ vm_instance.networkInterfaces[0].networkIP }}"
+      - "External IP: {{ vm_instance.networkInterfaces[0].accessConfigs[0].natIP | default('Not assigned') }}"
