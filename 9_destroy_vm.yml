@@ -7,9 +7,9 @@
     ACTION: "UNINSTALL" # INSTALL, UNINSTALL, UPDATE
 
   tasks:
-    #- name: gather cluster facts
-    #  include_role:
-    #    name: roles/gather-cluster-facts
+    - name: gather facts
+      include_role:
+        name: roles/gather-facts
 
     - name: destroy a VM instance (gcp)
       when: cloud_provider == "gcp"

@@ -1,0 +1,6 @@
+# Implement your initial tasks here
+# -------------------------------------------------
+
+- name: set facts
+  set_fact:
+    instance_default_user: "{{ ssh_username }}"

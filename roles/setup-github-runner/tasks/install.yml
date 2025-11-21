@@ -1,0 +1,10 @@
+# Implement your install deployment tasks here
+# -------------------------------------------------
+
+- name: configure podman
+  include_tasks:
+    file: ./install_podman.yml
+
+- name: configure github runner
+  include_tasks:
+    file: ./install_github_runner.yml

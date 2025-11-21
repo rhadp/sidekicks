@@ -1,4 +1,4 @@
-- name: create a VM instance
+- name: setup a github runner
   hosts: localhost
   vars:
     # set the following to control the install/uninstall process
@@ -11,10 +11,9 @@
       include_role:
         name: roles/gather-facts
 
-    - name: create a VM instance (gcp)
-      when: cloud_provider == "gcp"
+    - name: setup a github runner
       include_role:
-        name: roles/create-vm-gcp
+        name: roles/setup-github-runner
 
     - name: show ssh details
       debug:

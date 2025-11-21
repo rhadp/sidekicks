@@ -1,0 +1,105 @@
+# Implement your install deployment tasks here
+# -------------------------------------------------
+
+# make sure that podman works in the same way as docker does ...
+
+- name: create nodocker file
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  shell: |
+    mkdir -p /etc/containers
+    touch /etc/containers/nodocker
+
+- name: create .docker directory
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  ansible.builtin.file:
+    path: ".docker"
+    state: directory
+    owner: "{{ instance_default_user }}"
+    group: "{{ instance_default_user }}"
+    mode: "0755"
+
+- name: copy registries.conf
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  ansible.builtin.copy:
+    src: "../files/registries.conf"
+    dest: "/etc/containers/registries.conf"
+    mode: "0755"
+
+# configure podman to use storage on the additional disk, avoids out-of-disk-space issues
+
+- name: create container storage directory on additional disk
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  ansible.builtin.file:
+    path: "{{ work_dir }}/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  with_items:
+    - "containers/system"
+    - "containers/run/system"
+
+- name: copy global storage.conf
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  ansible.builtin.copy:
+    src: "../files/storage.conf"
+    dest: "/etc/containers/storage.conf"
+    mode: "0644"
+
+- name: create containers directory for user
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  ansible.builtin.file:
+    path: "{{ work_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ instance_default_user }}"
+    group: "{{ instance_default_user }}"
+    mode: "0755"
+  with_items:
+    - "containers/user"
+    - "containers/run/user"
+
+- name: create user config directory
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  ansible.builtin.file:
+    path: "/home/{{ instance_default_user }}/.config/containers"
+    state: directory
+    owner: "{{ instance_default_user }}"
+    group: "{{ instance_default_user }}"
+    mode: "0755"
+
+# fix issue "The cgroupv2 manager is set to systemd but there is no systemd user session available"
+
+- name: copy user containers.conf
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  ansible.builtin.copy:
+    src: "../files/containers-user.conf"
+    dest: "/home/{{ instance_default_user }}/.config/containers/containers.conf"
+    mode: "0644"
+
+- name: copy user storage.conf
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  ansible.builtin.copy:
+    src: "../files/storage-user.conf"
+    dest: "/home/{{ instance_default_user }}/.config/containers/storage.conf"
+    mode: "0644"
+
+# fix selinux issues, see https://access.redhat.com/solutions/7021610
+
+- name: re-label graphRoot
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  shell: |
+    semanage fcontext -a -e /var/lib/containers /mnt/data/containers/system
+    restorecon -R -v /mnt/data/containers/system
+
+    semanage fcontext -a -e /var/lib/containers /mnt/data/containers/user
+    restorecon -R -v /mnt/data/containers/user

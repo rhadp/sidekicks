@@ -1,0 +1,56 @@
+# gather basic facts about the environment
+
+- name: gather facts (aws)
+  when: cloud_provider == "aws"
+  block:
+    - name: get instance information
+      amazon.aws.ec2_instance_info:
+        filters:
+          "tag:Name": "{{ instance_name }}"
+          instance-state-name: ["running"]
+        aws_access_key: "{{ aws_access_key_id }}"
+        aws_secret_key: "{{ aws_secret_access_key }}"
+        region: "{{ aws_default_region }}"
+      register: vm_info
+
+    - name: set public ip facts
+      set_fact:
+        instance_public_ip: "{{ vm_info.instances[0].public_ip_address }}"
+        instance_public_dns: "{{ vm_info.instances[0].public_dns_name }}"
+      when: vm_info.instances | length > 0
+
+- name: gather facts (azure)
+  when: cloud_provider == "azure"
+  block:
+    - name: get instance information
+      azure.azcollection.azure_rm_publicipaddress_info:
+        name: "{{ instance_name }}-pip"
+        resource_group: "{{ azure_resource_group }}"
+        # azure credentials
+        client_id: "{{ azure_client_id }}"
+        secret: "{{ azure_password }}"
+        tenant: "{{ azure_tenant }}"
+        subscription_id: "{{ azure_subscription }}"
+      register: pip_info
+
+    - name: set public ip facts
+      set_fact:
+        instance_public_ip: "{{ pip_info.publicipaddresses[0].ip_address }}"
+      when: pip_info.publicipaddresses | length > 0
+
+- name: gather facts (gcp)
+  when: cloud_provider == "gcp"
+  block:
+    - name: get instance information
+      google.cloud.gcp_compute_instance_info:
+        zone: "{{ gcp_zone }}"
+        filters:
+          - name = {{ instance_name }}
+        project: "{{ gcp_project }}"
+        auth_kind: "{{ gcp_cred_kind }}"
+        service_account_file: "{{ gcp_cred_file }}"
+      register: instance_info
+
+    - name: set public ip facts
+      set_fact:
+        instance_public_ip: "{{ instance_info.resources[0].networkInterfaces[0].accessConfigs[0].natIP }}"

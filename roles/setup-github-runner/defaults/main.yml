@@ -1,0 +1,21 @@
+---
+# defaults
+public_key_dir: "{{ lookup('env', 'HOME') }}/.ssh"
+upgrade_all_packages: false
+
+# shared directories
+work_dir: "/mnt/data" # SHOULD be the same as volume_mount_point
+workspace_dir: "workspace"
+images_dir: "images"
+
+# github specific variables
+github_runner_group: "aib-runners"
+github_runner_labels: "self-hosted,arm64,aib"
+github_runner_version: "2.330.0" # see https://github.com/actions/runner/releases for the latest version
+github_runner_dir: "github-runner"
+
+# automotive-image-builder
+aib_repo: "https://gitlab.com/CentOS/automotive/src/automotive-image-builder"
+aib_branch: "main"
+aib_dest: "automotive-image-builder"
+aib_work_dir: "aib"

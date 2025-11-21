@@ -20,7 +20,7 @@
 
 - name: create VM instance with rhel10
   google.cloud.gcp_compute_instance:
-    name: "{{ vm_name }}"
+    name: "{{ instance_name }}"
     machine_type: "{{ vm_machine_type }}"
     zone: "{{ gcp_zone }}"
     tags:

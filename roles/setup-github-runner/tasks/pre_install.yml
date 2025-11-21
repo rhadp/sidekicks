@@ -1,0 +1,54 @@
+# Implement your pre-install deployment tasks here
+# -------------------------------------------------
+
+- name: install builder packages
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  dnf:
+    name: "{{ packages }}"
+    state: present
+  vars:
+    packages:
+      - buildah
+      - skopeo
+      - dotnet-sdk-9.0
+      - make
+      - cmake
+      - gcc
+      - g++
+
+- name: remove directories
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  ansible.builtin.file:
+    path: "{{ work_dir }}/{{ item }}"
+    state: absent
+  with_items:
+    - "{{ aib_work_dir }}"
+    - "{{ github_runner_dir }}"
+    - "{{ workspace_dir }}"
+    
+- name: re-create directories
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  ansible.builtin.file:
+    path: "{{ work_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ instance_default_user }}"
+    group: "{{ instance_default_user }}"
+    mode: "0755"
+  with_items:
+    - "{{ aib_work_dir }}"
+    - "{{ workspace_dir }}"
+    - "{{ images_dir }}"
+
+- name: clone the automotive-image-builder repo
+  delegate_to: "{{ instance_public_ip }}"
+  become: true
+  git:
+    repo: "{{ aib_repo }}"
+    dest: "{{ work_dir }}/{{ aib_work_dir }}/{{ aib_dest }}"
+    version: "{{ aib_branch }}"
+    single_branch: true
+    force: true
+    depth: 1

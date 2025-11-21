@@ -1,20 +1,19 @@
-- name: create a VM instance
+- name: remove a github runner
   hosts: localhost
   vars:
     # set the following to control the install/uninstall process
     silent: false
     become_override: false
-    ACTION: "INSTALL" # INSTALL, UNINSTALL, UPDATE
+    ACTION: "UNINSTALL" # INSTALL, UNINSTALL, UPDATE
 
   tasks:
     - name: gather facts
       include_role:
         name: roles/gather-facts
 
-    - name: create a VM instance (gcp)
-      when: cloud_provider == "gcp"
+    - name: remove a github runner
       include_role:
-        name: roles/create-vm-gcp
+        name: roles/setup-github-runner
 
     - name: show ssh details
       debug:

@@ -13,12 +13,11 @@ firewall_allow_ssh_http_https: "allow-ssh-http-https"
 firewall_allow_internal: "allow-internal"
 firewall_allow_egress: "allow-all-egress"
 
-# VM Instance Configuration
-vm_name: "rhauto-vm"
+# vm instance configuration
 vm_machine_type: "c4a-highmem-96-metal"
 vm_network_tier: "PREMIUM"
 
-# Disk Configuration
+# disk configuration
 boot_disk_size_gb: 20
 boot_disk_type: "hyperdisk-balanced"
 boot_disk_auto_delete: true
@@ -28,11 +27,11 @@ data_disk_size_gb: 200
 data_disk_type: "hyperdisk-balanced"
 data_disk_auto_delete: true
 
-# OS Image Configuration
+# os image configuration
 os_image_project: "rhel-cloud"
 os_image_family: "rhel-10-arm64"
 
-# Tags for the VM
+# tags for the vm
 vm_tags:
   - rhauto
   - http

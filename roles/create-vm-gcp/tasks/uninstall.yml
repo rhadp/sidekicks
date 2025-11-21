@@ -3,7 +3,7 @@
 
 - name: delete vm instance
   google.cloud.gcp_compute_instance:
-    name: "{{ vm_name }}"
+    name: "{{ instance_name }}"
     zone: "{{ gcp_zone }}"
     project: "{{ gcp_project }}"
     auth_kind: "{{ gcp_cred_kind }}"
